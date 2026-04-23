@@ -170,6 +170,12 @@ const formReparacion = document.getElementById('ticketFormReparacion');
 const containerReparaciones = document.getElementById('ticketsContainerReparaciones');
 const filterReparaciones = document.getElementById('filterStatusReparaciones');
 const btnClearReparaciones = document.getElementById('btnClearCompletedReparaciones');
+const searchByFacturas = document.getElementById('searchByFacturas');
+const searchInputFacturas = document.getElementById('searchInputFacturas');
+const searchByReparaciones = document.getElementById('searchByReparaciones');
+const searchInputReparaciones = document.getElementById('searchInputReparaciones');
+const searchStoreFacturas = document.getElementById('searchStoreFacturas');
+const searchStoreReparaciones = document.getElementById('searchStoreReparaciones');
 
 // Admin Elements
 const usersContainer = document.getElementById('usersContainer');
@@ -294,7 +300,11 @@ changePasswordForm.addEventListener('submit', (e) => {
 
 // ==================== ROLES & UI SETUP ====================
 function isAdmin() {
-    return (currentUser1 && currentUser1.role === 'admin') || (currentUser2 && currentUser2.role === 'admin');
+    return (currentUser1 && (currentUser1.role === 'admin' || currentUser1.role === 'tester')) || (currentUser2 && (currentUser2.role === 'admin' || currentUser2.role === 'tester'));
+}
+
+function isTester() {
+    return (currentUser1 && currentUser1.role === 'tester') || (currentUser2 && currentUser2.role === 'tester');
 }
 
 function applyRolesAndUI() {
@@ -347,6 +357,9 @@ function applyRolesAndUI() {
         tabAdminBtn.classList.remove('hidden');
         btnDeleteOldFacturas.style.display = 'inline-flex';
         btnClearReparaciones.style.display = 'inline-flex';
+        btnChangePassword.style.display = 'inline-flex';
+
+        document.querySelectorAll('.admin-search-option').forEach(el => el.style.display = 'flex');
 
         // Desbloquear tienda en formularios
         tiendaFactura.disabled = false;
@@ -357,6 +370,11 @@ function applyRolesAndUI() {
         tabAdminBtn.classList.add('hidden');
         btnDeleteOldFacturas.style.display = 'none';
         btnClearReparaciones.style.display = 'none';
+        btnChangePassword.style.display = 'none';
+
+        document.querySelectorAll('.admin-search-option').forEach(el => el.style.display = 'none');
+        if (searchStoreFacturas) searchStoreFacturas.value = '';
+        if (searchStoreReparaciones) searchStoreReparaciones.value = '';
 
         // Bloquear y autocompletar tienda predeterminada
         tiendaFactura.value = currentStore;
@@ -395,8 +413,33 @@ tabBtns.forEach(btn => {
 
 // ==================== TICKETS LOGIC ====================
 function getDisplayFacturas() {
-    if (isAdmin()) return facturas;
-    return facturas.filter(t => t.tienda === currentStore);
+    let list = isAdmin() ? facturas : facturas.filter(t => t.tienda === currentStore);
+    if (isAdmin() && searchStoreFacturas) {
+        const storeVal = searchStoreFacturas.value;
+        if (storeVal) {
+            list = list.filter(t => t.tienda === storeVal);
+        }
+    }
+    if (searchInputFacturas) {
+        let searchVal = searchInputFacturas.value.toLowerCase().trim();
+        if (searchVal) {
+            list = list.filter(t => {
+                const dateStr = (t.createdAt || t.date || '').toLowerCase();
+                if (dateStr.includes(searchVal)) return true;
+
+                let [d, m, y] = searchVal.split('/');
+                if (d && m) {
+                    let shortD = parseInt(d, 10).toString();
+                    let shortM = parseInt(m, 10).toString();
+                    let shortSearch = `${shortD}/${shortM}`;
+                    if (y) shortSearch += `/${y}`;
+                    if (dateStr.includes(shortSearch)) return true;
+                }
+                return false;
+            });
+        }
+    }
+    return list;
 }
 
 function getDisplayReparaciones() {
@@ -404,6 +447,31 @@ function getDisplayReparaciones() {
     const filter = filterReparaciones.value;
     if (filter !== 'Todos') {
         list = list.filter(t => t.status === filter);
+    }
+    if (isAdmin() && searchStoreReparaciones) {
+        const storeVal = searchStoreReparaciones.value;
+        if (storeVal) {
+            list = list.filter(t => t.tienda === storeVal);
+        }
+    }
+    if (searchInputReparaciones) {
+        let searchVal = searchInputReparaciones.value.toLowerCase().trim();
+        if (searchVal) {
+            list = list.filter(t => {
+                const dateStr = (t.createdAt || t.date || '').toLowerCase();
+                if (dateStr.includes(searchVal)) return true;
+
+                let [d, m, y] = searchVal.split('/');
+                if (d && m) {
+                    let shortD = parseInt(d, 10).toString();
+                    let shortM = parseInt(m, 10).toString();
+                    let shortSearch = `${shortD}/${shortM}`;
+                    if (y) shortSearch += `/${y}`;
+                    if (dateStr.includes(shortSearch)) return true;
+                }
+                return false;
+            });
+        }
     }
     return list;
 }
@@ -496,6 +564,12 @@ window.deleteTicket = function (id, type) {
 
 filterReparaciones.addEventListener('change', renderReparaciones);
 
+if (searchInputFacturas) searchInputFacturas.addEventListener('input', renderFacturas);
+if (searchStoreFacturas) searchStoreFacturas.addEventListener('change', renderFacturas);
+
+if (searchInputReparaciones) searchInputReparaciones.addEventListener('input', renderReparaciones);
+if (searchStoreReparaciones) searchStoreReparaciones.addEventListener('change', renderReparaciones);
+
 btnClearReparaciones.addEventListener('click', () => {
     if (!isAdmin()) return;
     if (confirm('¿Eliminar todos los tickets Realizados y Cancelados de Reparación?')) {
@@ -518,10 +592,10 @@ btnDeleteOldFacturas.addEventListener('click', () => {
 });
 
 function updateStatsFacturas() {
-    const list = getDisplayFacturas();
-    if (countPendingFacturas) countPendingFacturas.textContent = list.filter(t => t.status === 'Pendiente').length;
-    if (countDoneFacturas) countDoneFacturas.textContent = list.filter(t => t.status === 'Realizado').length;
-    if (countCancelledFacturas) countCancelledFacturas.textContent = list.filter(t => t.status === 'Cancelado').length;
+    const allFac = isAdmin() ? facturas : facturas.filter(t => t.tienda === currentStore);
+    if (countPendingFacturas) countPendingFacturas.textContent = allFac.filter(t => t.status === 'Pendiente').length;
+    if (countDoneFacturas) countDoneFacturas.textContent = allFac.filter(t => t.status === 'Realizado').length;
+    if (countCancelledFacturas) countCancelledFacturas.textContent = allFac.filter(t => t.status === 'Cancelado').length;
 }
 
 function updateStatsReparaciones() {
@@ -614,15 +688,34 @@ function renderAdminUsers() {
     usersContainer.innerHTML = '';
     users.forEach(u => {
         const isSelf = (currentUser1 && currentUser1.id === u.id) || (currentUser2 && currentUser2.id === u.id);
+        
+        let canModify = false;
+        if (isTester()) {
+            canModify = true; // tester can modify anyone
+        } else if (isAdmin() && u.role !== 'admin' && u.role !== 'tester') {
+            canModify = true; // admin can modify clients
+        } else if (isSelf) {
+            canModify = true; // anyone can modify themselves in theory, but this UI only shows for admins
+        }
+
+        let roleBadge = '';
+        if (u.role === 'tester') roleBadge = '<span class="admin-badge" style="background:var(--primary-dark)">Tester</span>';
+        else if (u.role === 'admin') roleBadge = '<span class="admin-badge">Admin</span>';
+
+        let passDisplay = u.password;
+        if (u.role === 'tester' && !isTester()) {
+            passDisplay = '********';
+        }
+
         usersContainer.innerHTML += `
             <div class="user-list-item">
                 <div>
-                    <h3 style="font-size:1rem;">${u.username} ${u.role === 'admin' ? '<span class="admin-badge">Admin</span>' : ''}</h3>
-                    <div style="font-size:0.8rem; color:#666; font-family:monospace;">Pass: ${u.password}</div>
+                    <h3 style="font-size:1rem;">${u.username} ${roleBadge}</h3>
+                    <div style="font-size:0.8rem; color:#666; font-family:monospace;">Pass: ${passDisplay}</div>
                 </div>
                 <div>
-                    <button class="btn btn-outline" style="color:#666; border-color:#ccc; padding:0.4rem 0.6rem; font-size:0.85rem;" onclick="promptResetPassword('${u.id}')">Cambiar Clave</button>
-                    ${!isSelf ? `<button class="btn btn-delete" style="padding:0.4rem 0.6rem; font-size:0.85rem;" onclick="deleteUser('${u.id}')"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    ${canModify ? `<button class="btn btn-outline" style="color:#666; border-color:#ccc; padding:0.4rem 0.6rem; font-size:0.85rem;" onclick="promptResetPassword('${u.id}')">Cambiar Clave</button>` : ''}
+                    ${(canModify && !isSelf && u.role !== 'tester') ? `<button class="btn btn-delete" style="padding:0.4rem 0.6rem; font-size:0.85rem;" onclick="deleteUser('${u.id}')"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div>
             </div>
         `;
