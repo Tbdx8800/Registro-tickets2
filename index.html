@@ -30,6 +30,7 @@
                     <option value="David">David</option>
                     <option value="Portal">Portal</option>
                     <option value="Coppel">Coppel</option>
+                    <option value="TestStore">TestStore</option>
                 </select>
             </div>
             <button id="btnSaveSetup" class="btn btn-primary w-full" style="margin-top: 1rem;">Guardar y
@@ -199,6 +200,7 @@
                                     <option value="David">David</option>
                                     <option value="Portal">Portal</option>
                                     <option value="Coppel">Coppel</option>
+                                    <option value="TestStore">TestStore</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -236,7 +238,7 @@
                 </section>
 
                 <section class="tickets-section">
-                    <div class="tickets-header">
+                    <div class="tickets-header" style="margin-bottom: 1rem;">
                         <h2><i class="fa-solid fa-list"></i> Registro de Facturas</h2>
                         <div style="display:flex; gap: 1rem; align-items: center;">
                             <button class="btn btn-outline-danger" id="btnDeleteOldFacturas"
@@ -246,6 +248,38 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- Búsqueda Profesional Facturas -->
+                    <div class="search-bar-container"
+                        style="display: flex; gap: 1rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                        <div
+                            style="flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 0.4rem; position: relative;">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: var(--primary-dark);"><i
+                                    class="fa-solid fa-calendar-day"
+                                    style="color:var(--primary-light); margin-right: 0.3rem;"></i> Fecha de
+                                registro</label>
+                            <input type="text" id="searchInputFacturas" placeholder="Ej: 21/04/2026"
+                                style="width: 100%; padding: 0.6rem 1rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
+                        </div>
+                        <div class="admin-search-option"
+                            style="flex: 1; min-width: 200px; display: none; flex-direction: column; gap: 0.4rem; position: relative;">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: var(--primary-dark);"><i
+                                    class="fa-solid fa-store"
+                                    style="color:var(--primary-light); margin-right: 0.3rem;"></i> Tienda de
+                                origen</label>
+                            <select id="searchStoreFacturas"
+                                style="width: 100%; padding: 0.6rem 1rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; font-family: 'Inter', sans-serif; outline: none; background: #fff; cursor: pointer; transition: border-color 0.2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
+                                <option value="">Todas las tiendas</option>
+                                <option value="Matriz">Matriz</option>
+                                <option value="Sunny">Sunny</option>
+                                <option value="Hospital">Hospital</option>
+                                <option value="David">David</option>
+                                <option value="Portal">Portal</option>
+                                <option value="Coppel">Coppel</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="tickets-container" id="ticketsContainerFacturas"></div>
                 </section>
             </div>
@@ -310,6 +344,7 @@
                                     <option value="David">David</option>
                                     <option value="Portal">Portal</option>
                                     <option value="Coppel">Coppel</option>
+                                    <option value="TestStore">TestStore</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -354,17 +389,50 @@
                 </section>
 
                 <section class="tickets-section">
-                    <div class="tickets-header">
+                    <div class="tickets-header" style="flex-wrap: wrap; margin-bottom: 1rem;">
                         <h2><i class="fa-solid fa-list"></i> Registro de Reparaciones</h2>
                         <div class="filter-group">
-                            <select id="filterStatusReparaciones">
-                                <option value="Todos">Todos</option>
-                                <option value="Pendiente">Pendientes</option>
-                                <option value="Realizado">Realizadas</option>
-                                <option value="Cancelado">Canceladas</option>
+                            <select id="filterStatusReparaciones"
+                                style="padding: 0.5rem 1rem; border: 1px solid #d1d5db; border-radius: 8px; font-weight: 500; outline: none;">
+                                <option value="Todos">Todos los Estados</option>
+                                <option value="Pendiente">Solo Pendientes</option>
+                                <option value="Realizado">Solo Realizadas</option>
+                                <option value="Cancelado">Solo Canceladas</option>
                             </select>
                         </div>
                     </div>
+
+                    <!-- Búsqueda Profesional Reparaciones -->
+                    <div class="search-bar-container"
+                        style="display: flex; gap: 1rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                        <div
+                            style="flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 0.4rem; position: relative;">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: var(--primary-dark);"><i
+                                    class="fa-solid fa-calendar-day"
+                                    style="color:var(--primary-light); margin-right: 0.3rem;"></i> Fecha de
+                                registro</label>
+                            <input type="text" id="searchInputReparaciones" placeholder="Ej: 21/04/2026"
+                                style="width: 100%; padding: 0.6rem 1rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
+                        </div>
+                        <div class="admin-search-option"
+                            style="flex: 1; min-width: 200px; display: none; flex-direction: column; gap: 0.4rem; position: relative;">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: var(--primary-dark);"><i
+                                    class="fa-solid fa-store"
+                                    style="color:var(--primary-light); margin-right: 0.3rem;"></i> Tienda de
+                                origen</label>
+                            <select id="searchStoreReparaciones"
+                                style="width: 100%; padding: 0.6rem 1rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; font-family: 'Inter', sans-serif; outline: none; background: #fff; cursor: pointer; transition: border-color 0.2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
+                                <option value="">Todas las tiendas</option>
+                                <option value="Matriz">Matriz</option>
+                                <option value="Sunny">Sunny</option>
+                                <option value="Hospital">Hospital</option>
+                                <option value="David">David</option>
+                                <option value="Portal">Portal</option>
+                                <option value="Coppel">Coppel</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="tickets-container" id="ticketsContainerReparaciones"></div>
                     <button class="btn btn-outline btn-clear-all" id="btnClearCompletedReparaciones"
                         style="width:100%; margin-top: 1rem;">Limpiar Realizadas/Canceladas</button>
@@ -409,4 +477,5 @@
 </body>
 
 </html>
-Se está trabajando en una nueva versión que hará cambios en cuanto a funciones para una mejor gestión. La Versión actual: 2026.4.01
+¡Nueva actualización! Se han hecho pequeños cambios para facilitar la gestión del sistema: Se ha eliminado la posibilidad de cambiar la contraseña para los clientes. Se ha añadido la búsqueda por fecha
+y se han hecho pequeños cambios en el lenguaje del sistema. Pronto se añadirán más cambios. 2026.4.2
