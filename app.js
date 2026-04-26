@@ -177,6 +177,34 @@ const searchInputReparaciones = document.getElementById('searchInputReparaciones
 const searchStoreFacturas = document.getElementById('searchStoreFacturas');
 const searchStoreReparaciones = document.getElementById('searchStoreReparaciones');
 
+// Confirm Ticket Modal
+const confirmTicketModal = document.getElementById('confirmTicketModal');
+const confirmTicketBody = document.getElementById('confirmTicketBody');
+const btnCancelConfirmTicket = document.getElementById('btnCancelConfirmTicket');
+const btnAcceptConfirmTicket = document.getElementById('btnAcceptConfirmTicket');
+
+// Payment Confirm Modal
+const paymentConfirmModal = document.getElementById('paymentConfirmModal');
+const paymentConfirmBody = document.getElementById('paymentConfirmBody');
+const btnCancelPaymentConfirm = document.getElementById('btnCancelPaymentConfirm');
+const btnAcceptPaymentConfirm = document.getElementById('btnAcceptPaymentConfirm');
+
+// Phone toggle for Reparaciones
+const clientPhoneReparacionInput = document.getElementById('clientPhoneReparacion');
+const noPhoneReparacionCheckbox = document.getElementById('noPhoneReparacion');
+if (noPhoneReparacionCheckbox) {
+    noPhoneReparacionCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            clientPhoneReparacionInput.value = '';
+            clientPhoneReparacionInput.disabled = true;
+            clientPhoneReparacionInput.placeholder = 'Sin número';
+        } else {
+            clientPhoneReparacionInput.disabled = false;
+            clientPhoneReparacionInput.placeholder = 'Ej: 555 123 4567';
+        }
+    });
+}
+
 // Admin Elements
 const usersContainer = document.getElementById('usersContainer');
 const btnResetStore = document.getElementById('btnResetStore');
@@ -359,7 +387,10 @@ function applyRolesAndUI() {
         btnClearReparaciones.style.display = 'inline-flex';
         btnChangePassword.style.display = 'inline-flex';
 
-        document.querySelectorAll('.admin-search-option').forEach(el => el.style.display = 'flex');
+        // Mostrar campos de búsqueda por tienda (admin only)
+        document.querySelectorAll('.admin-search-option').forEach(el => {
+            el.style.display = el.classList.contains('search-field') ? 'flex' : 'flex';
+        });
 
         // Desbloquear tienda en formularios
         tiendaFactura.disabled = false;
@@ -416,17 +447,21 @@ function getDisplayFacturas() {
     let list = isAdmin() ? facturas : facturas.filter(t => t.tienda === currentStore);
     if (isAdmin() && searchStoreFacturas) {
         const storeVal = searchStoreFacturas.value;
-        if (storeVal) {
-            list = list.filter(t => t.tienda === storeVal);
-        }
+        if (storeVal) list = list.filter(t => t.tienda === storeVal);
     }
     if (searchInputFacturas) {
         let searchVal = searchInputFacturas.value.toLowerCase().trim();
         if (searchVal) {
             list = list.filter(t => {
+                // Buscar por nombre de cliente
+                const clientStr = (t.client || '').toLowerCase();
+                if (clientStr.includes(searchVal)) return true;
+
+                // Buscar por fecha (coincidencia directa)
                 const dateStr = (t.createdAt || t.date || '').toLowerCase();
                 if (dateStr.includes(searchVal)) return true;
 
+                // Buscar por fecha en formato corto (d/m o d/m/yyyy)
                 let [d, m, y] = searchVal.split('/');
                 if (d && m) {
                     let shortD = parseInt(d, 10).toString();
@@ -445,22 +480,24 @@ function getDisplayFacturas() {
 function getDisplayReparaciones() {
     let list = isAdmin() ? reparaciones : reparaciones.filter(t => t.tienda === currentStore);
     const filter = filterReparaciones.value;
-    if (filter !== 'Todos') {
-        list = list.filter(t => t.status === filter);
-    }
+    if (filter !== 'Todos') list = list.filter(t => t.status === filter);
     if (isAdmin() && searchStoreReparaciones) {
         const storeVal = searchStoreReparaciones.value;
-        if (storeVal) {
-            list = list.filter(t => t.tienda === storeVal);
-        }
+        if (storeVal) list = list.filter(t => t.tienda === storeVal);
     }
     if (searchInputReparaciones) {
         let searchVal = searchInputReparaciones.value.toLowerCase().trim();
         if (searchVal) {
             list = list.filter(t => {
+                // Buscar por nombre de cliente
+                const clientStr = (t.client || '').toLowerCase();
+                if (clientStr.includes(searchVal)) return true;
+
+                // Buscar por fecha (coincidencia directa)
                 const dateStr = (t.createdAt || t.date || '').toLowerCase();
                 if (dateStr.includes(searchVal)) return true;
 
+                // Buscar por fecha en formato corto
                 let [d, m, y] = searchVal.split('/');
                 if (d && m) {
                     let shortD = parseInt(d, 10).toString();
@@ -479,54 +516,112 @@ function getDisplayReparaciones() {
 // Funciones saveFacturas y saveReparaciones eliminadas porque Firebase actualiza automáticamente
 // a través de onSnapshot. Solo enviaremos los datos con setDoc.
 
+// ==================== CONFIRM TICKET MODAL ====================
+let _pendingTicketData = null; // datos del ticket en espera de confirmación
+let _pendingTicketType = null; // 'factura' | 'reparacion'
+let _pendingTicketForm = null; // ref al form para resetear
+
+function showConfirmModal(fields, onAccept) {
+    confirmTicketBody.innerHTML = fields.map(f => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0.75rem; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+            <span style="color:var(--text-muted); font-size:0.9rem;">${f.label}</span>
+            <strong style="color:var(--primary-dark); font-size:0.95rem;">${f.value}</strong>
+        </div>
+    `).join('');
+    confirmTicketModal.classList.remove('hidden');
+    btnAcceptConfirmTicket.onclick = () => {
+        confirmTicketModal.classList.add('hidden');
+        onAccept();
+    };
+}
+
+btnCancelConfirmTicket.addEventListener('click', () => {
+    confirmTicketModal.classList.add('hidden');
+    _pendingTicketData = null;
+});
+
 formFactura.addEventListener('submit', (e) => {
     e.preventDefault();
-    let totalCost = parseFloat(document.getElementById('costTotalFactura').value).toFixed(2);
-    let newTicket = {
-        id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
-        type: 'Factura',
-        client: document.getElementById('clientNameFactura').value,
-        phone: document.getElementById('clientPhone').value,
-        tienda: isAdmin() ? document.getElementById('tiendaFactura').value : currentStore,
-        atendio: document.getElementById('atendioFactura').value,
-        totalCost: totalCost,
-        advanceCost: totalCost,
-        status: 'Realizado',
-        createdAt: new Date().toLocaleString(),
-        timestamp: Date.now(),
-        completedAt: new Date().toLocaleString()
-    };
+    const clientName = document.getElementById('clientNameFactura').value;
+    const phone = document.getElementById('clientPhone').value;
+    const totalCost = parseFloat(document.getElementById('costTotalFactura').value).toFixed(2);
+    const tienda = isAdmin() ? document.getElementById('tiendaFactura').value : currentStore;
+    const atendio = document.getElementById('atendioFactura').value;
 
-    // Guardar en Firestore (la lista local se actualizará automáticamente por onSnapshot)
-    setDoc(doc(db, "facturas", newTicket.id), newTicket);
+    const fields = [
+        { label: '👤 Nombre del cliente', value: clientName },
+        { label: '📞 Teléfono', value: phone || 'No proporcionado' },
+        { label: '💰 Costo total', value: `$${totalCost}` },
+    ];
 
-    e.target.reset();
-    applyRolesAndUI(); // reset selects
+    showConfirmModal(fields, () => {
+        let newTicket = {
+            id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+            type: 'Factura',
+            client: clientName,
+            phone: phone,
+            tienda: tienda,
+            atendio: atendio,
+            totalCost: totalCost,
+            advanceCost: totalCost,
+            status: 'Realizado',
+            createdAt: new Date().toLocaleString(),
+            timestamp: Date.now(),
+            completedAt: new Date().toLocaleString(),
+            paymentConfirmed: false
+        };
+        setDoc(doc(db, "facturas", newTicket.id), newTicket);
+        e.target.reset();
+        applyRolesAndUI();
+    });
 });
 
 formReparacion.addEventListener('submit', (e) => {
     e.preventDefault();
-    let newTicket = {
-        id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
-        type: 'Reparación',
-        client: document.getElementById('clientNameReparacion').value,
-        model: document.getElementById('deviceModel').value,
-        repairType: document.getElementById('repairType').value,
-        tienda: isAdmin() ? document.getElementById('tiendaReparacion').value : currentStore,
-        atendio: document.getElementById('atendioReparacion').value,
-        totalCost: parseFloat(document.getElementById('costTotalReparacion').value).toFixed(2),
-        advanceCost: parseFloat(document.getElementById('costAdvanceReparacion').value || '0').toFixed(2),
-        status: 'Pendiente',
-        createdAt: new Date().toLocaleString(),
-        timestamp: Date.now(),
-        completedAt: null
-    };
+    const clientName = document.getElementById('clientNameReparacion').value;
+    const noPhone = document.getElementById('noPhoneReparacion').checked;
+    const phone = noPhone ? 'Sin número' : (document.getElementById('clientPhoneReparacion').value || 'No proporcionado');
+    const model = document.getElementById('deviceModel').value;
+    const repairType = document.getElementById('repairType').value;
+    const tienda = isAdmin() ? document.getElementById('tiendaReparacion').value : currentStore;
+    const atendio = document.getElementById('atendioReparacion').value;
+    const totalCost = parseFloat(document.getElementById('costTotalReparacion').value).toFixed(2);
+    const advanceCost = parseFloat(document.getElementById('costAdvanceReparacion').value || '0').toFixed(2);
 
-    // Guardar en Firestore
-    setDoc(doc(db, "reparaciones", newTicket.id), newTicket);
+    const fields = [
+        { label: '👤 Nombre del cliente', value: clientName },
+        { label: '📞 Teléfono', value: phone },
+        { label: '📱 Modelo del equipo', value: model },
+        { label: '💰 Costo total', value: `$${totalCost}` },
+        { label: '🤝 Anticipo', value: `$${advanceCost}` },
+    ];
 
-    e.target.reset();
-    applyRolesAndUI(); // reset selects
+    showConfirmModal(fields, () => {
+        let newTicket = {
+            id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+            type: 'Reparación',
+            client: clientName,
+            phone: phone,
+            model: model,
+            repairType: repairType,
+            tienda: tienda,
+            atendio: atendio,
+            totalCost: totalCost,
+            advanceCost: advanceCost,
+            status: 'Pendiente',
+            createdAt: new Date().toLocaleString(),
+            timestamp: Date.now(),
+            completedAt: null
+        };
+        setDoc(doc(db, "reparaciones", newTicket.id), newTicket);
+        e.target.reset();
+        // Reset phone checkbox
+        const noPhoneCb = document.getElementById('noPhoneReparacion');
+        const phoneinput = document.getElementById('clientPhoneReparacion');
+        if (noPhoneCb) noPhoneCb.checked = false;
+        if (phoneinput) { phoneinput.disabled = false; phoneinput.placeholder = 'Ej: 555 123 4567'; }
+        applyRolesAndUI();
+    });
 });
 
 window.updateTicketStatus = function (id, newStatus, type) {
@@ -570,6 +665,20 @@ if (searchStoreFacturas) searchStoreFacturas.addEventListener('change', renderFa
 if (searchInputReparaciones) searchInputReparaciones.addEventListener('input', renderReparaciones);
 if (searchStoreReparaciones) searchStoreReparaciones.addEventListener('change', renderReparaciones);
 
+// Botones de limpiar búsqueda
+const clearSearchFacturasBtn = document.getElementById('clearSearchFacturas');
+if (clearSearchFacturasBtn) {
+    clearSearchFacturasBtn.addEventListener('click', () => {
+        if (searchInputFacturas) { searchInputFacturas.value = ''; renderFacturas(); }
+    });
+}
+const clearSearchReparacionesBtn = document.getElementById('clearSearchReparaciones');
+if (clearSearchReparacionesBtn) {
+    clearSearchReparacionesBtn.addEventListener('click', () => {
+        if (searchInputReparaciones) { searchInputReparaciones.value = ''; renderReparaciones(); }
+    });
+}
+
 btnClearReparaciones.addEventListener('click', () => {
     if (!isAdmin()) return;
     if (confirm('¿Eliminar todos los tickets Realizados y Cancelados de Reparación?')) {
@@ -606,6 +715,39 @@ function updateStatsReparaciones() {
     countCancelledReparaciones.textContent = allRep.filter(t => t.status === 'Cancelado').length;
 }
 
+// ==================== PAYMENT CONFIRM MODAL ====================
+let _pendingPaymentTicketId = null;
+
+btnCancelPaymentConfirm.addEventListener('click', () => {
+    paymentConfirmModal.classList.add('hidden');
+    _pendingPaymentTicketId = null;
+});
+btnAcceptPaymentConfirm.addEventListener('click', () => {
+    if (!_pendingPaymentTicketId) return;
+    const ticketIdx = facturas.findIndex(t => t.id === _pendingPaymentTicketId);
+    if (ticketIdx !== -1) {
+        facturas[ticketIdx].paymentConfirmed = true;
+        facturas[ticketIdx].paymentConfirmedAt = new Date().toLocaleString();
+        facturas[ticketIdx].paymentConfirmedBy = currentUser1 ? currentUser1.username : 'Admin';
+        setDoc(doc(db, "facturas", facturas[ticketIdx].id), facturas[ticketIdx]);
+    }
+    paymentConfirmModal.classList.add('hidden');
+    _pendingPaymentTicketId = null;
+});
+
+window.openPaymentConfirm = function(id) {
+    const ticket = facturas.find(t => t.id === id);
+    if (!ticket) return;
+    _pendingPaymentTicketId = id;
+    paymentConfirmBody.innerHTML = `
+        <div style="margin-bottom:0.5rem;"><strong>Cliente:</strong> ${ticket.client}</div>
+        <div style="margin-bottom:0.5rem;"><strong>Teléfono:</strong> ${ticket.phone || 'N/A'}</div>
+        <div style="margin-bottom:0.5rem;"><strong>Total:</strong> $${ticket.totalCost}</div>
+        <div><strong>Fecha:</strong> ${ticket.createdAt}</div>
+    `;
+    paymentConfirmModal.classList.remove('hidden');
+};
+
 function renderTicketCard(ticket) {
     let statusIcon = '';
     if (ticket.status === 'Pendiente') statusIcon = '<i class="fa-solid fa-clock"></i>';
@@ -616,6 +758,48 @@ function renderTicketCard(ticket) {
     let creationDate = ticket.createdAt || ticket.date;
 
     const adminDeleteMarkup = isAdmin() ? `<button class="btn-delete" onclick="deleteTicket('${ticket.id}', '${ticket.type}')" title="Eliminar Ticket"><i class="fa-solid fa-trash"></i></button>` : '';
+
+    // ---- Button visibility rules ----
+    // FACTURAS:
+    //   - Si está Cancelado: NO mostrar botón "Realizado" ni "Pendiente"
+    //   - Si está Realizado: NO mostrar botón "Cancelado" (ya fue realizado)
+    //   - Botón de pago confirmado solo para admin/tester y si NO está ya confirmado
+    // REPARACIONES:
+    //   - Si está Realizado o Cancelado: NO mostrar ningún botón de cambio de estado
+
+    let actionButtons = `<button class="btn-status" onclick="printTicket('${ticket.id}', '${ticket.type}')" title="Imprimir Ticket"><i class="fa-solid fa-print" style="color:#475569"></i></button>`;
+
+    if (ticket.type === 'Factura') {
+        if (ticket.status === 'Realizado') {
+            // No mostrar Cancelado (ya realizado, sólo confirmar pago)
+        } else if (ticket.status === 'Cancelado') {
+            // No mostrar Realizado ni Pendiente
+        } else {
+            // Pendiente o cualquier otro: mostrar Realizado y Cancelado
+            actionButtons += `<button class="btn-status" onclick="updateTicketStatus('${ticket.id}', 'Realizado', '${ticket.type}')" title="Marcar como Realizado"><i class="fa-solid fa-check" style="color:var(--status-done)"></i></button>`;
+            actionButtons += `<button class="btn-status" onclick="updateTicketStatus('${ticket.id}', 'Cancelado', '${ticket.type}')" title="Marcar como Cancelado"><i class="fa-solid fa-xmark" style="color:var(--status-cancelled)"></i></button>`;
+        }
+        // Botón de confirmación de pago (solo admin/tester)
+        if (isAdmin() && ticket.status === 'Realizado' && !ticket.paymentConfirmed) {
+            actionButtons += `<button class="btn-status btn-pay-confirm" onclick="openPaymentConfirm('${ticket.id}')" title="Confirmar Pago (Admin)"><i class="fa-solid fa-money-bill-wave" style="color:#10b981"></i></button>`;
+        }
+        if (ticket.paymentConfirmed) {
+            actionButtons += `<span class="payment-confirmed-badge" title="Pago confirmado por ${ticket.paymentConfirmedBy || 'Admin'}"><i class="fa-solid fa-circle-check"></i> Pago OK</span>`;
+        }
+    } else {
+        // REPARACIONES
+        if (ticket.status === 'Pendiente') {
+            // Puede cambiar a Realizado o Cancelado
+            actionButtons += `<button class="btn-status" onclick="updateTicketStatus('${ticket.id}', 'Realizado', '${ticket.type}')" title="Marcar como Realizado"><i class="fa-solid fa-check" style="color:var(--status-done)"></i></button>`;
+            actionButtons += `<button class="btn-status" onclick="updateTicketStatus('${ticket.id}', 'Cancelado', '${ticket.type}')" title="Marcar como Cancelado"><i class="fa-solid fa-xmark" style="color:var(--status-cancelled)"></i></button>`;
+        }
+        // Si está Realizado o Cancelado: NO mostrar botones de cambio de estado
+    }
+
+    actionButtons += adminDeleteMarkup;
+
+    // Phone display: reparaciones may have phone too
+    const phoneDisplay = ticket.phone ? `<div><i class="fa-solid fa-phone" style="width:20px"></i> Tel: <strong>${ticket.phone}</strong></div>` : '';
 
     return `
         <div class="ticket-card" data-status="${ticket.status}">
@@ -628,8 +812,9 @@ function renderTicketCard(ticket) {
                     </div>
                     <div class="ticket-details">
                         ${ticket.type === 'Factura' ? `
-                            <div><i class="fa-solid fa-phone" style="width:20px"></i> Teléfono: <strong>${ticket.phone}</strong></div>
+                            <div><i class="fa-solid fa-phone" style="width:20px"></i> Teléfono: <strong>${ticket.phone || 'N/A'}</strong></div>
                         ` : `
+                            ${phoneDisplay}
                             <div><i class="fa-solid fa-mobile-button" style="width:20px"></i> Modelo: <strong>${ticket.model}</strong></div>
                             <div><i class="fa-solid fa-wrench" style="width:20px"></i> Falla/Reparación: <strong>${ticket.repairType}</strong></div>
                         `}
@@ -648,13 +833,10 @@ function renderTicketCard(ticket) {
                 <div class="ticket-date-area">
                     <div class="ticket-date"><i class="fa-regular fa-calendar-plus"></i> Creado: <strong>${creationDate}</strong></div>
                     ${ticket.completedAt ? `<div class="ticket-date" style="margin-top:0.25rem; color: ${ticket.status === 'Realizado' ? 'var(--status-done)' : 'var(--status-cancelled)'}"><i class="fa-solid fa-flag-checkered"></i> Concluido: <strong>${ticket.completedAt}</strong></div>` : ''}
+                    ${ticket.paymentConfirmed ? `<div class="ticket-date" style="margin-top:0.25rem; color:#10b981;"><i class="fa-solid fa-circle-check"></i> Pago confirmado por <strong>${ticket.paymentConfirmedBy || 'Admin'}</strong> el ${ticket.paymentConfirmedAt || ''}</div>` : ''}
                 </div>
                 <div class="ticket-actions">
-                    <button class="btn-status" onclick="printTicket('${ticket.id}', '${ticket.type}')" title="Imprimir Ticket"><i class="fa-solid fa-print" style="color:#475569"></i></button>
-                    ${ticket.status !== 'Realizado' ? `<button class="btn-status" onclick="updateTicketStatus('${ticket.id}', 'Realizado', '${ticket.type}')" title="Marcar como Realizado"><i class="fa-solid fa-check" style="color:var(--status-done)"></i></button>` : ''}
-                    ${ticket.status !== 'Cancelado' ? `<button class="btn-status" onclick="updateTicketStatus('${ticket.id}', 'Cancelado', '${ticket.type}')" title="Marcar como Cancelado"><i class="fa-solid fa-xmark" style="color:var(--status-cancelled)"></i></button>` : ''}
-                    ${(ticket.status !== 'Pendiente' && ticket.type !== 'Factura') ? `<button class="btn-status" onclick="updateTicketStatus('${ticket.id}', 'Pendiente', '${ticket.type}')" title="Mover a Pendiente"><i class="fa-solid fa-clock" style="color:var(--status-pending)"></i></button>` : ''}
-                    ${adminDeleteMarkup}
+                    ${actionButtons}
                 </div>
             </div>
         </div>
@@ -771,6 +953,21 @@ btnResetDB.addEventListener('click', () => {
 const clientPhoneFacturaInput = document.getElementById('clientPhone');
 if (clientPhoneFacturaInput) {
     clientPhoneFacturaInput.addEventListener('input', function (e) {
+        let value = this.value.replace(/[^0-9\s]/g, '');
+        let numCount = 0;
+        let limitIndex = value.length;
+        for (let i = 0; i < value.length; i++) {
+            if (/[0-9]/.test(value[i])) { numCount++; if (numCount === 10) { limitIndex = i + 1; break; } }
+        }
+        if (numCount >= 10) value = value.substring(0, limitIndex);
+        this.value = value;
+    });
+}
+
+// Misma validación para el teléfono de Reparaciones (clientPhoneReparacionInput ya declarado arriba)
+if (clientPhoneReparacionInput) {
+    clientPhoneReparacionInput.addEventListener('input', function (e) {
+        if (this.disabled) return; // ignorar si "Sin teléfono" está marcado
         let value = this.value.replace(/[^0-9\s]/g, '');
         let numCount = 0;
         let limitIndex = value.length;
